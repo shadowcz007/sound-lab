@@ -8,15 +8,18 @@ import time
 import typing as T
 from pathlib import Path
 
- 
 import flask
  
 from flask_cors import CORS
 
-import random
+import random,io
 import base64
+import numpy as np
+import soundfile as sf
+import librosa
 
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
+from datasets import load_dataset
 import torch
 import scipy
 
@@ -76,6 +79,30 @@ def run_app(
     app.run(**args)  # type: ignore
 
 
+
+def base64_to_numpy(base64_string):
+    # 将base64字符串解码为二进制数据
+    audio_data = base64.b64decode(base64_string)
+    
+    # 将二进制数据转换为numpy数组
+    audio_numpy = np.frombuffer(audio_data, dtype=np.int16)
+    
+    # 将多声道音频转换为单声道
+    audio_mono = convert_to_mono(audio_numpy)
+    
+    return audio_mono
+
+def convert_to_mono(audio):
+    # 检查音频的维度
+    if audio.ndim > 1:
+        # 计算音频的平均值，得到单声道音频
+        mono_audio = np.mean(audio, axis=1)
+    else:
+        mono_audio = audio
+
+    return mono_audio
+
+
 @app.route("/run_inference/", methods=["POST"])
 def run_inference():
     """
@@ -113,16 +140,56 @@ def run_inference():
     #         "marim",
     #         "agile"
     #     ])
+
+    text=[]
+    if 'text' in json_data:
+        text=json_data['text']
+
+    audio=[]
+    if 'audio' in json_data:
+        bs=json_data['audio']
+        for base64_string in bs:
+            # 将Base64编码的音频数据解码为二进制数据
+            #base64_string = "BASE64_ENCODED_AUDIO_DATA_HERE"
+            base64_string = base64_string.split(",")[1]
+        
+            #
+            audio_mono = base64_to_numpy(base64_string)
+           
+            audio.append(audio_mono[: len(audio_mono) // 4])
     
-     
 
     inputs = processor(
-        text=json_data['text'],
+        text=text,
+        audio=audio,
+        sampling_rate=32000,
         padding=True,
         return_tensors="pt",
     )
 
-    audio_values = model.generate(**inputs.to(device), do_sample=True, guidance_scale=3, max_new_tokens=256)
+    max_tokens=256 #default=5, le=30
+    if 'duration' in json_data:
+        max_tokens=int(json_data['duration']*1000*0.0512)
+
+    temperature=1
+    if 'temperature' in json_data:
+        temperature=json_data['temperature']
+
+    seed=-1
+    if 'seed' in json_data:
+        seed=json_data['seed']
+
+    guidance_scale=3.1
+    if 'guidance_scale' in json_data:
+        guidance_scale=json_data['guidance_scale']
+
+    # input_audio
+
+    audio_values = model.generate(**inputs.to(device), 
+    do_sample=True, 
+    guidance_scale=guidance_scale, 
+    max_new_tokens=max_tokens,
+    )
 
     audio=audio_values[0, 0].cpu().numpy()
 
