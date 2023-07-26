@@ -15,13 +15,11 @@ from flask_cors import CORS
 import random,io
 import base64
 import numpy as np
-import soundfile as sf
-import librosa
+from scipy.io import wavfile
 
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
-from datasets import load_dataset
 import torch
-import scipy
+
 
 # Global variable for the model  
 processor = None
@@ -65,6 +63,9 @@ def run_app(
     model.generation_config.temperature = 1.5
 
 
+    print(model.config.audio_encoder.sampling_rate)
+
+
     args = dict(
         debug=debug,
         threaded=False,
@@ -78,7 +79,17 @@ def run_app(
 
     app.run(**args)  # type: ignore
 
-
+def base64_audio_to_numpy(base64_audio):
+    audio_bytes = base64.b64decode(base64_audio)
+    audio_io = io.BytesIO(audio_bytes)
+    sample_rate, audio_data = wavfile.read(audio_io)
+    print(audio_data.ndim)
+    if audio_data.ndim > 1:
+        audio_data = audio_data[:, 0]  # 只取左声道，即单通道
+    print(audio_data)
+    # audio_data = audio_data.astype(np.float32) / 32767.0  # 归一化到[-1.0, 1.0]范围
+    
+    return audio_data
 
 def base64_to_numpy(base64_string):
     # 将base64字符串解码为二进制数据
@@ -141,6 +152,9 @@ def run_inference():
     #         "agile"
     #     ])
 
+    sampling_rate = model.config.audio_encoder.sampling_rate
+
+
     text=[]
     if 'text' in json_data:
         text=json_data['text']
@@ -148,28 +162,33 @@ def run_inference():
     audio=[]
     if 'audio' in json_data:
         bs=json_data['audio']
+        
         for base64_string in bs:
             # 将Base64编码的音频数据解码为二进制数据
             #base64_string = "BASE64_ENCODED_AUDIO_DATA_HERE"
             base64_string = base64_string.split(",")[1]
         
-            #
-            audio_mono = base64_to_numpy(base64_string)
+            audio_mono = base64_audio_to_numpy(base64_string)
            
-            audio.append(audio_mono[: len(audio_mono) // 4])
+            s=audio_mono[: len(audio_mono) // (2*len(bs))]
+            # print(s.shape)
+            audio.append(s)
     
 
     inputs = processor(
         text=text,
         audio=audio,
-        sampling_rate=32000,
+        sampling_rate=sampling_rate,
         padding=True,
         return_tensors="pt",
     )
 
     max_tokens=256 #default=5, le=30
     if 'duration' in json_data:
-        max_tokens=int(json_data['duration']*1000*0.0512)
+        max_tokens=int(json_data['duration']*50)
+    print(max_tokens,sampling_rate)
+    # audio_length_in_s = 256 / sampling_rate
+
 
     temperature=1
     if 'temperature' in json_data:
@@ -193,8 +212,8 @@ def run_inference():
 
     audio=audio_values[0, 0].cpu().numpy()
 
-    sampling_rate = model.config.audio_encoder.sampling_rate
-    scipy.io.wavfile.write("musicgen_out.wav", rate=sampling_rate, data=audio)
+    
+    wavfile.write("musicgen_out.wav", rate=sampling_rate, data=audio)
 
     with open("musicgen_out.wav", "rb") as audio_file:
         audio_data = audio_file.read()
