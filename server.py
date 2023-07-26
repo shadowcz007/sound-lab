@@ -12,13 +12,58 @@ import flask
  
 from flask_cors import CORS
 
-import random,io
+import random,io,os
 import base64
 import numpy as np
 from scipy.io import wavfile
+from pydub import AudioSegment
+from pydub.utils import mediainfo
 
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
 import torch
+
+def get_audio_format(base64_audio):
+    audio_bytes = base64.b64decode(base64_audio)
+    with open("temp_audio_file", "wb") as file:
+        file.write(audio_bytes)
+    audio_info = mediainfo("temp_audio_file")
+    audio_format = audio_info["codec_name"]
+    os.remove("temp_audio_file")
+    return audio_format
+
+def convert_to_wav(mp3_base64_audio):
+    audio_bytes = base64.b64decode(mp3_base64_audio)
+    mp3_path="temp_mp3_audio_file"
+    wav_path="temp_wav_audio_file"
+    with open(mp3_path, "wb") as file:
+        file.write(audio_bytes)
+    audio = AudioSegment.from_mp3(mp3_path)
+    audio.export(wav_path, format="wav")
+
+    sample_rate, audio_data = wavfile.read(wav_path)
+    # print(audio_data.ndim)
+    if audio_data.ndim > 1:
+        audio_data = audio_data[:, 0]  # 只取左声道，即单通道
+    # print(audio_data)
+    # audio_data = audio_data.astype(np.float32) / 32767.0  # 归一化到[-1.0, 1.0]范围
+    os.remove(mp3_path)
+    os.remove(wav_path)
+    return audio_data
+
+
+def base64_audio_to_numpy(base64_audio):
+    audio_bytes = base64.b64decode(base64_audio)
+    audio_io = io.BytesIO(audio_bytes)
+    print(audio_io)
+    sample_rate, audio_data = wavfile.read(audio_io)
+    print(audio_data.ndim)
+    if audio_data.ndim > 1:
+        audio_data = audio_data[:, 0]  # 只取左声道，即单通道
+    print(audio_data)
+    # audio_data = audio_data.astype(np.float32) / 32767.0  # 归一化到[-1.0, 1.0]范围
+    
+    return audio_data
+
 
 
 # Global variable for the model  
@@ -79,39 +124,7 @@ def run_app(
 
     app.run(**args)  # type: ignore
 
-def base64_audio_to_numpy(base64_audio):
-    audio_bytes = base64.b64decode(base64_audio)
-    audio_io = io.BytesIO(audio_bytes)
-    sample_rate, audio_data = wavfile.read(audio_io)
-    print(audio_data.ndim)
-    if audio_data.ndim > 1:
-        audio_data = audio_data[:, 0]  # 只取左声道，即单通道
-    print(audio_data)
-    # audio_data = audio_data.astype(np.float32) / 32767.0  # 归一化到[-1.0, 1.0]范围
-    
-    return audio_data
 
-def base64_to_numpy(base64_string):
-    # 将base64字符串解码为二进制数据
-    audio_data = base64.b64decode(base64_string)
-    
-    # 将二进制数据转换为numpy数组
-    audio_numpy = np.frombuffer(audio_data, dtype=np.int16)
-    
-    # 将多声道音频转换为单声道
-    audio_mono = convert_to_mono(audio_numpy)
-    
-    return audio_mono
-
-def convert_to_mono(audio):
-    # 检查音频的维度
-    if audio.ndim > 1:
-        # 计算音频的平均值，得到单声道音频
-        mono_audio = np.mean(audio, axis=1)
-    else:
-        mono_audio = audio
-
-    return mono_audio
 
 
 @app.route("/run_inference/", methods=["POST"])
@@ -163,25 +176,43 @@ def run_inference():
     if 'audio' in json_data:
         bs=json_data['audio']
         
-        for base64_string in bs:
-            # 将Base64编码的音频数据解码为二进制数据
-            #base64_string = "BASE64_ENCODED_AUDIO_DATA_HERE"
+        for b in bs:
+            if 'url' in b:
+                base64_string=b['url']
+            else:
+                base64_string=b
+            
             base64_string = base64_string.split(",")[1]
-        
-            audio_mono = base64_audio_to_numpy(base64_string)
-           
+
+            #格式
+            audio_format = get_audio_format(base64_string)
+            print(audio_format)
+            if audio_format!='wav':
+                audio_mono=convert_to_wav(base64_string)
+            else:
+                audio_mono = base64_audio_to_numpy(base64_string)
+            
             s=audio_mono[: len(audio_mono) // (2*len(bs))]
             # print(s.shape)
             audio.append(s)
     
-
-    inputs = processor(
-        text=text,
-        audio=audio,
-        sampling_rate=sampling_rate,
-        padding=True,
-        return_tensors="pt",
-    )
+    
+    if len(audio)>0:
+        inputs = processor(
+            text=text,
+            audio=audio,
+            sampling_rate=sampling_rate,
+            padding=True,
+            return_tensors="pt",
+        )
+    else:
+        inputs = processor(
+            text=text,
+            # audio=audio,
+            # sampling_rate=sampling_rate,
+            padding=True,
+            return_tensors="pt",
+        )
 
     max_tokens=256 #default=5, le=30
     if 'duration' in json_data:
