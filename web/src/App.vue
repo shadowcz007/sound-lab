@@ -141,15 +141,18 @@ export default {
 // })
 
       // fetch()
-      
-        requestAnimationFrame(()=>{
-          const pos= getPosition()
+
+      this.$refs.renderer.onBeforeRender(() => {
+        const pos= getPosition()
         this.raycaster.setFromCamera(pos, this.$refs.renderer.three.camera);
         this.raycaster.ray.intersectPlane(this.pointerPlane, this.pointerV3);
         const x = 2 * this.pointerV3.x / this.WIDTH;
         const y = 2 * this.pointerV3.y / this.HEIGHT;
         this.liquidEffect.addDrop(x, y, 0.025, 0.005);
-        })
+      });
+      
+      
+     
 
     }
   },
