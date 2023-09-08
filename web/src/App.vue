@@ -37,28 +37,48 @@ import LiquidPlane from 'troisjs/src/components/liquid/LiquidPlane.js';
 import WaveSurfer from 'wavesurfer.js'
 
 
-function createSound(){
-  const duration = 5; // 持续时间（秒）
-const sampleRate = 44100; // 采样率（每秒采样次数）
-const frequency = 440; // 基准频率（Hz）
+/**
+ * 
+x轴代表时间，y轴代表波峰值，y取值范围-1至1，x轴是一个圆圈的范围，取值在-1至1之间，这个点的坐标让它运动起来非常美妙，有节奏和韵律感，注重有趣的动态变化和运动规律
 
-const numSamples = duration * sampleRate; // 总采样数
-const samples = new Float32Array(numSamples); // 存储采样值的数组
+ */
+ function generateSound(frequencies, duration, sampleRate) {
+  const samples = [];
+  const numSamples = Math.floor(duration * sampleRate);
+  const amplitude = 1; // Maximum amplitude for normalized audio
+  const centerX = 0; // X coordinate of center
+  const centerY = 0; // Y coordinate of center
+  const radius = 1; // Radius of the circle
 
-for (let i = 0; i < numSamples; i++) {
-  const t = i / sampleRate; // 当前时间（秒）
-  const value = Math.sin(2 * Math.PI * frequency * t); // 正弦函数取值
-  samples[i] = value;
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const angle = t * 2 * Math.PI;
+    const x = centerX + radius * Math.cos(angle);
+    const y = centerY + radius * Math.sin(angle);
+    let sample = 0;
+
+    for (let j = 0; j < frequencies.length; j++) {
+      sample += amplitude * y * Math.sin(2 * Math.PI * frequencies[j] * t);
+    }
+
+    samples.push([x,sample]);
+  }
+
+  return samples;
 }
-console.log(samples); // 输出采样值数组
-return samples
-}
+
+const frequencies = [440, 880, 1320]; // Frequencies of A4, A5, and E6
+const duration = 10; // 1 second
+const sampleRate = 44100; // 44.1 kHz
+
 
 window._index=0;
-const _sounds=createSound();
+const _sounds=generateSound(frequencies, duration, sampleRate);;
 const getPosition=()=>{
-  const pos=new Vector2(_sounds[window._index],0)
+  const pos=new Vector2(..._sounds[window._index])
         window._index++;
+        if(_sounds.length<=window._index) window._index=0;
+      console.log(pos)
     return pos
 }
 
@@ -151,8 +171,6 @@ export default {
         this.liquidEffect.addDrop(x, y, 0.025, 0.005);
       });
       
-      
-     
 
     }
   },
