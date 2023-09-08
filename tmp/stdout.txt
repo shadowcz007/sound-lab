@@ -1,0 +1,8 @@
+ Volume in drive C is OS
+ Volume Serial Number is 5EA3-1E5C
+
+ Directory of C:\Users\38957\Documents\GitHub\sound-lab\venv\Scripts
+
+2023/09/08  17:49           268,568 python.exe
+               1 File(s)        268,568 bytes
+               0 Dir(s)   8,807,870,464 bytes free
