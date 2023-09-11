@@ -75,9 +75,15 @@ device = None
 app = flask.Flask(__name__)
 CORS(app)
 
+# 获取当前脚本文件的路径
+current_path = os.path.dirname(os.path.abspath(__file__))
+# 构建文件路径
+file_path =os.path.abspath(os.path.join(current_path, "..", "model", "musicgen-small"))
+
+
 def run_app(
     *,
-    checkpoint: str = "facebook/musicgen-small",
+    checkpoint: str =file_path,
     dec: str = "cuda",
     host: str = "127.0.0.1",
     port: int = 3013,

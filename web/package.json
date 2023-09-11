@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "chroma-js": "^2.4.2",
+    "pitchfinder": "^2.3.2",
     "three": "^0.134.0",
     "troisjs": "^0.3.3",
     "tweakpane": "^4.0.1",

@@ -126,6 +126,17 @@ def prepare_environment():
     if not is_installed("flask_cors"):
         run_pip(f"install Flask-Cors -i https://pypi.tuna.tsinghua.edu.cn/simple","Flask-Cors")
 
+    if not is_installed("argh"):
+        run_pip(f"install argh -i https://pypi.tuna.tsinghua.edu.cn/simple","argh")
+
+
+    # # 安装相关依赖
+    # if not os.path.isfile(requirements_file):
+    #     requirements_file =os.path(__file__,requirements_file) 
+    # # print(requirements_file)
+    # #  -i https://pypi.tuna.tsinghua.edu.cn/simple
+    # run_pip(f"install -r \"{requirements_file}\"", "requirements for Web UI")
+
     check_python_version()
 
     commit = commit_hash()
