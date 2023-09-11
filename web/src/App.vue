@@ -69,7 +69,7 @@ function getRandomPrompt() {
 
 
 const pitchWorker = (data) => {
-  const { peaks, sampleRate = 8000, algo = 'AMDF' } =  data
+  const { peaks, sampleRate = 32000, algo = 'AMDF' } =  data
   const detectPitch = Pitchfinder[algo]({ sampleRate })
   const duration = peaks.length / sampleRate
   const bpm = peaks.length / duration / 60
@@ -147,7 +147,7 @@ const getPosition=()=>{
     return pos
 }
 
-const sounds=[]
+const sounds=['musicgen_out.wav']
 
 
 export default {
@@ -228,17 +228,49 @@ export default {
 
 
 const randomGet=()=>{
+  document.querySelector('#waveform').innerHTML='';
   const sound = sounds[Math.floor(Math.random() * sounds.length)];
 
 let peaks,duration,length;
-const height = 100,items=[];
+const height = 500,items=[];
 
 const wavesurfer = WaveSurfer.create({
   container: '#waveform',
   waveColor: '#4F4A85',
-  progressColor: '#383351',
+  progressColor: 'white',
   autoplay:true,
   url: sound,
+  renderFunction: (channels, ctx) => {
+    const { width, height } = ctx.canvas
+    const scale = channels[0].length / width
+    const step = 10
+
+    ctx.translate(0, height / 2)
+    ctx.strokeStyle = ctx.fillStyle
+    ctx.beginPath()
+
+    for (let i = 0; i < width; i += step * 2) {
+      const index = Math.floor(i * scale)
+      const value = Math.abs(channels[0][index])
+      let x = i
+      let y = value * height
+
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, y)
+      ctx.arc(x + step / 2, y, step / 2, Math.PI, 0, true)
+      ctx.lineTo(x + step, 0)
+
+      x = x + step
+      y = -y
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, y)
+      ctx.arc(x + step / 2, y, step / 2, Math.PI, 0, false)
+      ctx.lineTo(x + step, 0)
+    }
+
+    ctx.stroke()
+    ctx.closePath()
+  },
 })
 
 
@@ -259,22 +291,34 @@ wavesurfer.on('ready',e=>{
   })
 
   console.log('ready',peaks )
+
+  
 })
 
 wavesurfer.on('timeupdate',e=>{
   let index=Math.round(items.length*e/duration)
  
-  let pos=new Vector2(0,items[index]||0)
-  console.log('timeupdate',pos)
+  let pos=new Vector2(0,0)
+  // console.log('timeupdate',pos)
 
      this.raycaster.setFromCamera(pos, this.$refs.renderer.three.camera);
 this.raycaster.ray.intersectPlane(this.pointerPlane, this.pointerV3);
 const x = 2 * this.pointerV3.x / this.WIDTH;
 const y = 2 * this.pointerV3.y / this.HEIGHT;
-this.liquidEffect.addDrop(x, y, 0.025, 0.005);
+this.liquidEffect.addDrop(x, y, 0.025,0.01* items[index]||0);
 
 
 })
+
+
+wavesurfer.on('finish',e=>{
+  this.light1Color = chroma.random().hex();
+      this.light2Color = chroma.random().hex();
+      this.light3Color = chroma.random().hex();
+      this.light4Color = chroma.random().hex();
+  randomGet();
+})
+
 }
 
 document.querySelector('#waveform').innerHTML='';
