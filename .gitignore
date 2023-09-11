@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 AudioLDM2-main
+model
 # C extensions
 *.so
 
