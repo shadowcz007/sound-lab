@@ -110,10 +110,16 @@ def prepare_environment():
     # 安装torch GPU版本
     if not is_installed("torch") or not is_installed("torchvision"):
         run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)
-        
+    
+    if not is_installed("accelerate"):
+        run_pip(f"install accelerate -i https://pypi.tuna.tsinghua.edu.cn/simple","accelerate")
+
     if not is_installed("transformers"):
         run_pip(f"install git+https://ghproxy.com/https://github.com/huggingface/transformers.git -i https://pypi.tuna.tsinghua.edu.cn/simple","transformers")
     
+    if not is_installed("diffusers"):
+        run_pip(f"install git+https://ghproxy.com/https://github.com/huggingface/diffusers -i https://pypi.tuna.tsinghua.edu.cn/simple","diffusers")
+
     if not is_installed("pydub"):
         run_pip(f"install pydub -i https://pypi.tuna.tsinghua.edu.cn/simple","pydub")
 

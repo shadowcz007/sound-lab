@@ -2,8 +2,6 @@
   <Renderer ref="renderer" antialias :pointer="{ onMove: onPointerMove }" :orbit-ctrl="{ enableDamping: true }"
     resize="window">
     <Camera :position="{ z: 10 }" />
-
-
     <Scene ref="scene">
 
       <AmbientLight />
@@ -31,10 +29,11 @@ import {
   Camera,
   PointLight,
   Renderer,
-  Scene,
+  Scene,BoxGeometry,BasicMaterial,Mesh
 } from 'troisjs';
 import LiquidPlane from 'troisjs/src/components/liquid/LiquidPlane.js';
 import Pitchfinder from 'pitchfinder'
+
 
 const _prompts=[
 "The golden sunlight filters through the colorful autumn leaves.",
@@ -147,7 +146,30 @@ const getPosition=()=>{
     return pos
 }
 
-const sounds=['musicgen_out.wav']
+// // fetch()
+      // fetch('http://127.0.0.1:3013/run_inference/', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json'
+      //   },
+      //   body: JSON.stringify({ text  })
+      // })
+      //   .then(response => response.json())
+      //   .then(data => {
+      //     const {audio}=data;
+      //     if(audio){
+      //       sounds.push(audio);
+      //       randomGet()
+      //     }
+      //   })
+      //   .catch(error => console.log(error));
+
+
+
+const sounds=[{
+  images:['1.png','3.png','2.png'],
+  audios:['musicgen_out.wav']
+}]
 
 
 export default {
@@ -157,7 +179,7 @@ export default {
     LiquidPlane,
     PointLight,
     Renderer,
-    Scene,
+    Scene
   },
   setup() {
     return {
@@ -218,7 +240,7 @@ export default {
       this.light4Color = chroma.random().hex();
     },
     randomSound(){
-
+  
 //       const wavesurfer = WaveSurfer.create({
 //   container: '#waveform',
 //   waveColor: '#4F4A85',
@@ -226,20 +248,47 @@ export default {
 //   url: '/audio.mp3',
 // })
 
+function convertPointToB(x_A, y_A) {
+  var x_B = (2 * x_A) - 1;
+  var y_B = (2 * y_A) - 1;
+  return [x_B,  -y_B ]
+}
 
-const randomGet=()=>{
-  document.querySelector('#waveform').innerHTML='';
-  const sound = sounds[Math.floor(Math.random() * sounds.length)];
+const randomGet=(soundObj)=>{
+  
+  const _x=Math.random()
+  const _y=Math.random()
+
+const w=document.createElement('div');
+const p=document.createElement('div');
+document.body.appendChild(w);
+document.body.appendChild(p);
+
+p.className='poster';
+p.innerHTML=`
+    <img src="${soundObj.images[[Math.floor(Math.random() * soundObj.images.length)]]}" />
+  `
+  p.querySelector('img').addEventListener('click',()=>{
+    wavesurfer.play()
+  })
+
+ 
+
+  p.style.top =  `calc(${_y*100}% - 100px)`
+  p.style.left= `calc(${_x*100}% - 100px)`
+
+  // document.querySelector('#waveform').innerHTML='';
+  const audio = soundObj.audios[Math.floor(Math.random() * soundObj.audios.length)];
 
 let peaks,duration,length;
 const height = 500,items=[];
 
 const wavesurfer = WaveSurfer.create({
-  container: '#waveform',
+  container: w,
   waveColor: '#4F4A85',
   progressColor: 'white',
-  autoplay:true,
-  url: sound,
+  autoplay:false,
+  url: audio,
   renderFunction: (channels, ctx) => {
     const { width, height } = ctx.canvas
     const scale = channels[0].length / width
@@ -298,14 +347,14 @@ wavesurfer.on('ready',e=>{
 wavesurfer.on('timeupdate',e=>{
   let index=Math.round(items.length*e/duration)
  
-  let pos=new Vector2(0,0)
+  let pos=new Vector2(...convertPointToB(_x,_y))
   // console.log('timeupdate',pos)
 
      this.raycaster.setFromCamera(pos, this.$refs.renderer.three.camera);
 this.raycaster.ray.intersectPlane(this.pointerPlane, this.pointerV3);
 const x = 2 * this.pointerV3.x / this.WIDTH;
 const y = 2 * this.pointerV3.y / this.HEIGHT;
-this.liquidEffect.addDrop(x, y, 0.025,0.01* items[index]||0);
+this.liquidEffect.addDrop(x, y, 0.125,0.01* items[index]||0);
 
 
 })
@@ -316,63 +365,30 @@ wavesurfer.on('finish',e=>{
       this.light2Color = chroma.random().hex();
       this.light3Color = chroma.random().hex();
       this.light4Color = chroma.random().hex();
-  randomGet();
+  //     const sound=sounds[Math.floor(Math.random() * sounds.length)];
+  // randomGet(sound)
+ 
 })
 
 }
 
 document.querySelector('#waveform').innerHTML='';
 
-if(sounds.length==0){
-      // fetch()
-      fetch('http://127.0.0.1:3013/run_inference/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: getRandomPrompt()  })
-      })
-        .then(response => response.json())
-        .then(data => {
-          const {audio}=data;
-          if(audio){
+  const sound=sounds[Math.floor(Math.random() * sounds.length)];
+  randomGet(sound)
+  const text=getRandomPrompt()
+ 
 
-            sounds.push(audio);
-randomGet()
-          }
-        })
-        .catch(error => console.log(error));
-}else{
-  randomGet()
-  fetch('http://127.0.0.1:3013/run_inference/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: getRandomPrompt()  })
-      })
-        .then(response => response.json())
-        .then(data => {
-          const {audio}=data;
-          if(audio){
-
-            sounds.push(audio);
-
-          }
-        })
-        .catch(error => console.log(error));
-}
-
-
-      // this.$refs.renderer.onBeforeRender(() => {
-      //   const pos= getPosition()
-      //   this.raycaster.setFromCamera(pos, this.$refs.renderer.three.camera);
-      //   this.raycaster.ray.intersectPlane(this.pointerPlane, this.pointerV3);
-      //   const x = 2 * this.pointerV3.x / this.WIDTH;
-      //   const y = 2 * this.pointerV3.y / this.HEIGHT;
-      //   this.liquidEffect.addDrop(x, y, 0.025, 0.005);
-      // });
-      
+//   fetch('http://127.0.0.1:3013/run_inference/', {
+//   method: 'POST',
+//   headers: {
+//     'Content-Type': 'application/json'
+//   },
+//   body: JSON.stringify({ text: 'sun day',duration:5  })
+// })
+//   .then(response => response.json())
+//   .then(data => console.log(data))
+//   .catch(error => console.log(error));
 
     }
   },

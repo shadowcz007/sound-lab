@@ -18,11 +18,27 @@
     width: 80%;
     margin-left: 10%;
       }
+      .poster{
+        position: fixed;
+    top: calc(50% - 100px);
+    border-radius: 100%;
+    left: calc(50% - 100px);
+    overflow: hidden;
+    z-index: 999;
+    height: 200px;
+    width: 200px;
+      }
+
+      .poster img{
+    height: 200px;
+    width: 200px; 
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="waveform"></div>
+    <div id="poster"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
