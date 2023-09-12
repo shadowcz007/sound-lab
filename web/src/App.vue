@@ -12,6 +12,8 @@
 
       <LiquidPlane ref="liquid" :width="WIDTH" :height="HEIGHT" :width-segments="512" :height-segments="512"
         :color="color" :metalness="metalness" :roughness="roughness" />
+
+
     </Scene>
 
   </Renderer>
@@ -21,7 +23,7 @@
 
 <script>
 import WaveSurfer from 'wavesurfer.js'
-import { Plane, Raycaster, Vector3,Vector2 } from 'three';
+import { Plane, Raycaster, Vector3,Vector2,InstancedBufferAttribute, Object3D } from 'three';
 import {Pane} from 'tweakpane';
 import chroma from 'chroma-js';
 import {
@@ -29,11 +31,12 @@ import {
   Camera,
   PointLight,
   Renderer,
-  Scene,BoxGeometry,BasicMaterial,Mesh
+  Scene,BoxGeometry,BasicMaterial,Mesh,InstancedMesh,
+  PhongMaterial,
 } from 'troisjs';
 import LiquidPlane from 'troisjs/src/components/liquid/LiquidPlane.js';
 import Pitchfinder from 'pitchfinder'
-
+ 
 
 const _prompts=[
 "The golden sunlight filters through the colorful autumn leaves.",
@@ -101,50 +104,7 @@ const pitchWorker = (data) => {
 }
 
 
-/**
- * 
-x轴代表时间，y轴代表波峰值，y取值范围-1至1，x轴是一个圆圈的范围，取值在-1至1之间，这个点的坐标让它运动起来非常美妙，有节奏和韵律感，注重有趣的动态变化和运动规律
 
- */
- function generateSound(frequencies, duration, sampleRate) {
-  const samples = [];
-  const numSamples = Math.floor(duration * sampleRate);
-  const amplitude = 1; // Maximum amplitude for normalized audio
-  const centerX = 0; // X coordinate of center
-  const centerY = 0; // Y coordinate of center
-  const radius = 1; // Radius of the circle
-
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const angle = t * 2 * Math.PI;
-    const x = centerX + radius * Math.cos(angle);
-    const y = centerY + radius * Math.sin(angle);
-    let sample = 0;
-
-    for (let j = 0; j < frequencies.length; j++) {
-      sample += amplitude * y * Math.sin(2 * Math.PI * frequencies[j] * t);
-    }
-
-    samples.push([x,sample]);
-  }
-
-  return samples;
-}
-
-const frequencies = [440, 880, 1320]; // Frequencies of A4, A5, and E6
-const duration = 10; // 1 second
-const sampleRate = 44100; // 44.1 kHz
-
-
-window._index=0;
-const _sounds=generateSound(frequencies, duration, sampleRate);;
-const getPosition=()=>{
-  const pos=new Vector2(..._sounds[window._index])
-        window._index++;
-        if(_sounds.length<=window._index) window._index=0;
-      console.log(pos)
-    return pos
-}
 
 // // fetch()
       // fetch('http://127.0.0.1:3013/run_inference/', {
@@ -166,10 +126,7 @@ const getPosition=()=>{
 
 
 
-const sounds=[{
-  images:['1.png','3.png','2.png'],
-  audios:['musicgen_out.wav']
-}]
+const sounds=[]
 
 
 export default {
@@ -181,12 +138,21 @@ export default {
     Renderer,
     Scene
   },
+ 
   setup() {
+    const SIZE = 1.6, NX = 25, NY = 25, PADDING = 1;
+    const SIZEP = SIZE + PADDING;
+    const W = NX * SIZEP - PADDING;
+    const H = NY * SIZEP - PADDING;
     return {
+      SIZE, NX, NY, PADDING,
+      SIZEP, W, H,
+      NUM_INSTANCES: NX * NY,
       WIDTH: 30,
       HEIGHT: 30,
     };
   },
+
   data() {
     return {
       color: '#ffffff',
@@ -199,7 +165,7 @@ export default {
     };
   },
   mounted() {
-    
+    this.renderer = this.$refs.renderer;
     this.pointer = this.$refs.renderer.three.pointer;
     this.liquidEffect = this.$refs.liquid.liquidEffect;
     this.liquidEffect.addDrop(0, 0, 0.05, 0.05);
@@ -215,19 +181,29 @@ export default {
     this.pane.addBinding(this, 'roughness', { min: 0, max: 1 });
     this.pane.addButton({ title: 'Random lights' }).on('click', this.randomColors);
 
+    this.pane.addButton({ title: 'Create' }).on('click', this.create);
+
     this.pane.addButton({ title: 'Random sound' }).on('click', this.randomSound);
 
+ 
+    this.renderer.onBeforeRender(this.animate);
   },
   unmounted() {
     this.pane.dispose();
   },
   methods: {
+    animate() {
+      this.updateInstanceMatrix();
+    },
+    updateInstanceMatrix() {
+    
+    },
     onPointerMove() {
-      this.raycaster.setFromCamera(this.pointer.positionN, this.$refs.renderer.three.camera);
-      this.raycaster.ray.intersectPlane(this.pointerPlane, this.pointerV3);
-      const x = 2 * this.pointerV3.x / this.WIDTH;
-      const y = 2 * this.pointerV3.y / this.HEIGHT;
-      this.liquidEffect.addDrop(x, y, 0.025, 0.005);
+      // this.raycaster.setFromCamera(this.pointer.positionN, this.$refs.renderer.three.camera);
+      // this.raycaster.ray.intersectPlane(this.pointerPlane, this.pointerV3);
+      // const x = 2 * this.pointerV3.x / this.WIDTH;
+      // const y = 2 * this.pointerV3.y / this.HEIGHT;
+      // this.liquidEffect.addDrop(x, y, 0.025, 0.005);
 
       // -1,1   | 1,1
       // -1,-1  | 1,-1
@@ -239,6 +215,11 @@ export default {
       this.light3Color = chroma.random().hex();
       this.light4Color = chroma.random().hex();
     },
+    create(){
+      const text=getRandomPrompt()
+      create(text)
+ 
+    },
     randomSound(){
   
 //       const wavesurfer = WaveSurfer.create({
@@ -248,34 +229,27 @@ export default {
 //   url: '/audio.mp3',
 // })
 
-function convertPointToB(x_A, y_A) {
-  var x_B = (2 * x_A) - 1;
-  var y_B = (2 * y_A) - 1;
-  return [x_B,  -y_B ]
-}
+
 
 const randomGet=(soundObj)=>{
   
-  const _x=Math.random()
-  const _y=Math.random()
+  const _x=Math.random()*0.9
+  const _y=Math.random()*0.9
 
 const w=document.createElement('div');
-const p=document.createElement('div');
+const p=createCard("text",soundObj.images[[Math.floor(Math.random() * soundObj.images.length)]])
+
 document.body.appendChild(w);
 document.body.appendChild(p);
 
 p.className='poster';
-p.innerHTML=`
-    <img src="${soundObj.images[[Math.floor(Math.random() * soundObj.images.length)]]}" />
-  `
-  p.querySelector('img').addEventListener('click',()=>{
+ 
+  p.querySelector('.drop-down-window').addEventListener('click',()=>{
     wavesurfer.play()
   })
 
- 
-
-  p.style.top =  `calc(${_y*100}% - 100px)`
-  p.style.left= `calc(${_x*100}% - 100px)`
+  p.style.top =  `calc(${_y*100}% - 140px)`
+  p.style.left= `calc(${_x*100}% - 90px)`
 
   // document.querySelector('#waveform').innerHTML='';
   const audio = soundObj.audios[Math.floor(Math.random() * soundObj.audios.length)];
@@ -366,8 +340,7 @@ wavesurfer.on('finish',e=>{
       this.light3Color = chroma.random().hex();
       this.light4Color = chroma.random().hex();
   //     const sound=sounds[Math.floor(Math.random() * sounds.length)];
-  // randomGet(sound)
- 
+  // randomGet(sound) 
 })
 
 }
@@ -376,25 +349,55 @@ document.querySelector('#waveform').innerHTML='';
 
   const sound=sounds[Math.floor(Math.random() * sounds.length)];
   randomGet(sound)
-  const text=getRandomPrompt()
- 
-
-//   fetch('http://127.0.0.1:3013/run_inference/', {
-//   method: 'POST',
-//   headers: {
-//     'Content-Type': 'application/json'
-//   },
-//   body: JSON.stringify({ text: 'sun day',duration:5  })
-// })
-//   .then(response => response.json())
-//   .then(data => console.log(data))
-//   .catch(error => console.log(error));
 
     }
   },
 };
 
+function createCard(text,url){
+  let div=document.createElement('div');
+  div.innerHTML=`<div class='card'>
+  <div class='img-cont'>
+    <span class='drop-down-window'>PLAY</span>
+    <img class='img' src="${url}" alt="">
+  </div>
+  <div class='content-cont'>
+    <span class='card-header'>Standard</span>
+    <span class='card-body'>${text}</span>
+  </div>
+</div>`
+return div
+}
 
+
+function create(text){
+  fetch('http://127.0.0.1:3013/run_inference/', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ text,duration:8 })
+})
+  .then(response => response.json())
+  .then(data => {
+    const {audio,images}=data;
+    let sound={
+      audios:['data:audio/wav;base64,'+audio.base64],
+      images:Array.from(images,im=>{
+        return 'data:image/png;base64,'+im.base64
+      })
+    }
+    sounds.push(sound)
+  })
+  .catch(error => console.log(error));
+}
+
+
+function convertPointToB(x_A, y_A) {
+  var x_B = (2 * x_A) - 1;
+  var y_B = (2 * y_A) - 1;
+  return [x_B,  -y_B ]
+}
 
 </script>
 

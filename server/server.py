@@ -164,7 +164,7 @@ def text_to_audio(text,duration,guidance_scale=3.1):
     # input_audio   
     wavfile.write(output_file, rate=sampling_rate, data=audio)
 
-    with open("musicgen_out.wav", "rb") as audio_file:
+    with open(output_file, "rb") as audio_file:
         audio_data = audio_file.read()
         audio_base64 = base64.b64encode(audio_data).decode("utf-8")
 
@@ -172,7 +172,7 @@ def text_to_audio(text,duration,guidance_scale=3.1):
     
     return {
         "output_file":output_file,
-        "audio_base64":audio_base64
+        "base64":audio_base64
         }
 
 
@@ -207,12 +207,14 @@ def text_to_img(text,num_images_per_prompt=1):
     im_files=[]
     for index, im in enumerate(images):
         f=get_save_file_path(text,"_image"+str(index)+".jpg")
-        im_files.append(f)
+        image_base64 = base64.b64encode(im.tobytes()).decode('utf-8')
         im.save(f)
+        im_files.append({
+            "output_file":f,
+            "base64":image_base64
+        })
 
     # sd_model = sd_model.to(torch.device('cpu'))
-
-    
 
     return im_files
 
@@ -310,6 +312,7 @@ def run_inference():
     if 'text' in json_data:
         text=json_data['text']
 
+    num_images_per_prompt=3
     if 'num_images_per_prompt' in json_data:
         num_images_per_prompt=json_data['num_images_per_prompt']
 
@@ -362,7 +365,7 @@ def run_inference():
     
     audio=text_to_audio(text,json_data['duration'])
 
-    images=text_to_img(text,num_images_per_prompt=3)
+    images=text_to_img(text,num_images_per_prompt=num_images_per_prompt)
     
     # audio_length_in_s = 256 / sampling_rate
 
