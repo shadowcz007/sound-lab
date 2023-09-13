@@ -18,11 +18,13 @@ import numpy as np
 from scipy.io import wavfile
 from pydub import AudioSegment
 from pydub.utils import mediainfo
+from PIL import Image
 
 import torch
 from accelerate import Accelerator
 from transformers import AutoProcessor, MusicgenForConditionalGeneration
 from diffusers import StableDiffusionPanoramaPipeline, DDIMScheduler, StableDiffusionPipeline
+
 
 
 # from accelerate.utils import write_basic_config
@@ -68,7 +70,11 @@ def init_sd_model(model_ckpt,dec="cuda"):
     sd_model = sd_model.to(device)
 
 def get_save_file_path(text,file_name):
-    directory=get_id(text)
+
+    if os.path.exists('output')==False:
+        os.mkdir('output')
+
+    directory='output/'+get_id(text)
     if os.path.exists(directory):
         print("Directory exists")
     else:
@@ -119,6 +125,14 @@ def base64_audio_to_numpy(base64_audio):
     # audio_data = audio_data.astype(np.float32) / 32767.0  # 归一化到[-1.0, 1.0]范围
     
     return audio_data
+
+
+def image_to_base64(image, fmt='png') -> str:
+    output_buffer = io.BytesIO()
+    image.save(output_buffer, format=fmt)
+    byte_data = output_buffer.getvalue()
+    base64_str = base64.b64encode(byte_data).decode('utf-8')
+    return f'data:image/{fmt};base64,' + base64_str
 
 def get_id(text):
     encoded_text = text.encode('utf-8')
@@ -172,7 +186,7 @@ def text_to_audio(text,duration,guidance_scale=3.1):
     
     return {
         "output_file":output_file,
-        "base64":audio_base64
+        "base64":f'data:audio/wav;base64,'+audio_base64
         }
 
 
@@ -206,9 +220,12 @@ def text_to_img(text,num_images_per_prompt=1):
     
     im_files=[]
     for index, im in enumerate(images):
-        f=get_save_file_path(text,"_image"+str(index)+".jpg")
-        image_base64 = base64.b64encode(im.tobytes()).decode('utf-8')
+        f=get_save_file_path(text,"_image"+str(index)+".png")
         im.save(f)
+
+        image = Image.open(f)
+        image_base64 = image_to_base64(image,'png')
+        
         im_files.append({
             "output_file":f,
             "base64":image_base64
@@ -308,9 +325,13 @@ def run_inference():
 
     
 
-    text=[]
-    if 'text' in json_data:
-        text=json_data['text']
+    prompt=""
+    if 'prompt' in json_data:
+        prompt=json_data['prompt']
+
+    title=''
+    if 'title' in json_data:
+        title=json_data['title']
 
     num_images_per_prompt=3
     if 'num_images_per_prompt' in json_data:
@@ -363,9 +384,9 @@ def run_inference():
     #     )
     # else:
     
-    audio=text_to_audio(text,json_data['duration'])
+    audio=text_to_audio(prompt,json_data['duration'])
 
-    images=text_to_img(text,num_images_per_prompt=num_images_per_prompt)
+    images=text_to_img(prompt,num_images_per_prompt=num_images_per_prompt)
     
     # audio_length_in_s = 256 / sampling_rate
 
@@ -373,7 +394,7 @@ def run_inference():
     # audio_bytes = audio.tobytes()
     # audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
 
-    response =json.dumps({"audio":audio,"images":images}) 
+    response =json.dumps({"audio":audio,"images":images,"prompt":prompt,"title":title}) 
 
     return response
 

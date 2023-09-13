@@ -39,6 +39,9 @@ import Pitchfinder from 'pitchfinder'
  
 
 const _prompts=[
+  {
+    title:"Autumn Sun",
+    prompts:[
 "The golden sunlight filters through the colorful autumn leaves.",
 "The crisp autumn air is filled with the warmth of the sun.",
 "The gentle breeze carries the scent of fallen leaves in the autumn sunshine.",
@@ -60,13 +63,19 @@ const _prompts=[
 "The autumn sunsets are a breathtaking spectacle, painting the sky in shades of orange and purple.",
 "Under the autumn sun, the world seems to slow down, allowing me to appreciate the beauty around me."
 ]
+  }
+]
 
 // 随机取元素的方法
 function getRandomPrompt() {
   // 生成一个随机的索引
   var randomIndex = Math.floor(Math.random() * _prompts.length);
   // 返回对应索引的元素
-  return _prompts[randomIndex];
+  const {title,prompts}=_prompts[randomIndex];
+  
+  return {
+    title,prompt:prompts[Math.floor(Math.random() * prompts.length)]
+  }
 }
 
 
@@ -216,9 +225,8 @@ export default {
       this.light4Color = chroma.random().hex();
     },
     create(){
-      const text=getRandomPrompt()
-      create(text)
- 
+      const {title,prompt}=getRandomPrompt()
+      create(title,prompt);
     },
     randomSound(){
   
@@ -233,19 +241,53 @@ export default {
 
 const randomGet=(soundObj)=>{
   
-  const _x=Math.random()*0.9
-  const _y=Math.random()*0.9
+  let _x=Math.random()*0.9,
+    _y=Math.random()*0.9,
+    _w=0.105;
 
 const w=document.createElement('div');
-const p=createCard("text",soundObj.images[[Math.floor(Math.random() * soundObj.images.length)]])
+const p=createCard(soundObj.title,soundObj.prompt,soundObj.images[[Math.floor(Math.random() * soundObj.images.length)]])
 
 document.body.appendChild(w);
 document.body.appendChild(p);
 
+p.querySelector('.random').addEventListener('click',()=>{
+  _w=Math.random()*0.01
+})
+
+
+let _isMove=false;
+p.querySelector('.move').addEventListener('click',()=>{
+  _isMove=!_isMove;
+})
+
 p.className='poster';
+
+window.addEventListener("mousemove", (e) => {
+let x = e.clientX,
+y = e.clientY;
+if(_isMove){
+
+  _x=x/window.screen.width;
+_y=y/window.screen.height;
+
+  p.style.left= `${x-20}px`
+  p.style.top = `${y-20}px`
+}
+
+});
+
  
   p.querySelector('.drop-down-window').addEventListener('click',()=>{
-    wavesurfer.play()
+    console.log(wavesurfer)
+    if(wavesurfer.isPlaying()) {
+      wavesurfer.stop()
+      
+    }else{
+      wavesurfer.play()
+      _isMove=false;
+    }
+
   })
 
   p.style.top =  `calc(${_y*100}% - 140px)`
@@ -328,7 +370,7 @@ wavesurfer.on('timeupdate',e=>{
 this.raycaster.ray.intersectPlane(this.pointerPlane, this.pointerV3);
 const x = 2 * this.pointerV3.x / this.WIDTH;
 const y = 2 * this.pointerV3.y / this.HEIGHT;
-this.liquidEffect.addDrop(x, y, 0.125,0.01* items[index]||0);
+this.liquidEffect.addDrop(x, y,_w,0.01* items[index]||0);
 
 
 })
@@ -339,8 +381,7 @@ wavesurfer.on('finish',e=>{
       this.light2Color = chroma.random().hex();
       this.light3Color = chroma.random().hex();
       this.light4Color = chroma.random().hex();
-  //     const sound=sounds[Math.floor(Math.random() * sounds.length)];
-  // randomGet(sound) 
+      wavesurfer.play()
 })
 
 }
@@ -354,7 +395,7 @@ document.querySelector('#waveform').innerHTML='';
   },
 };
 
-function createCard(text,url){
+function createCard(title,text,url){
   let div=document.createElement('div');
   div.innerHTML=`<div class='card'>
   <div class='img-cont'>
@@ -362,32 +403,38 @@ function createCard(text,url){
     <img class='img' src="${url}" alt="">
   </div>
   <div class='content-cont'>
-    <span class='card-header'>Standard</span>
+    <span class='card-header'>${title}</span>
     <span class='card-body'>${text}</span>
+    <div style="display: flex"><span class='card-btn random'>RANDOM</span>
+    <span class='card-btn move'>MOVE</span></div>
+    
   </div>
 </div>`
 return div
 }
 
 
-function create(text){
+function create(title,prompt){
+  console.log('## Create')
   fetch('http://127.0.0.1:3013/run_inference/', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json'
   },
-  body: JSON.stringify({ text,duration:8 })
+  body: JSON.stringify({title, prompt,duration:8 })
 })
   .then(response => response.json())
   .then(data => {
-    const {audio,images}=data;
+    const {title,prompt,audio,images}=data;
     let sound={
-      audios:['data:audio/wav;base64,'+audio.base64],
+      title,prompt,
+      audios:[audio.base64],
       images:Array.from(images,im=>{
-        return 'data:image/png;base64,'+im.base64
+        return im.base64
       })
     }
-    sounds.push(sound)
+    sounds.push(sound);
+    document.querySelector('#count').innerHTML=`<p>${sounds.length}</p>`
   })
   .catch(error => console.log(error));
 }
