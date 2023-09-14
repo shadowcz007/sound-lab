@@ -6,6 +6,9 @@ AudioLDM2-main
 model
 # C extensions
 *.so
+output/
+tmp/
+venv/
 
 # Distribution / packaging
 .Python
